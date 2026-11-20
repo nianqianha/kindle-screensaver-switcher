@@ -40,6 +40,24 @@ kss conn               测连接
 
 图会被转成设备屏幕的尺寸（工具自己从设备读，不用你管机型），存成 `bg_ssNN.png` 放进 `/var/local/custom_screensavers/`。下次熄屏生效。
 
+## 截图
+
+菜单：
+
+![菜单](docs/screenshots/1-menu.png)
+
+检查连接：
+
+![连接状态](docs/screenshots/2-conn.png)
+
+列出屏保图：
+
+![列出](docs/screenshots/3-ls.png)
+
+加图：
+
+![加图](docs/screenshots/4-add.png)
+
 ## 两个实现细节
 
 删文件、切分区这些动作放在 Kindle 上跑（`kss-agent.sh`），电脑上只发一句命令。不是为了别的，是 Windows 杀软看到一整串操作容易误报。
