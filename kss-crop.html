@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kindle 屏保选图工具</title>
+<!--
+  Kindle 屏保选图工具（2026-11-28 通用化）。
+  来源：由 K-ON 屏保裁剪工具 crop.html 改造——去掉内嵌的 base64 图片，
+  改为从本地选图；比例/输出尺寸从写死 1072x1448 改为机型表驱动，
+  与 kss-devices.ps1 / models.py 同一份事实来源。
+  纯前端单文件，双击即可用，不需要 Python 或联网。
+-->
+<style>
+  body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; margin: 16px; background:#f5f5f5; color:#222; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .hint { font-size:12px; color:#666; margin-bottom:12px; line-height:1.6; }
+  .bar { margin-bottom:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  select, button, input { font-size:14px; padding:5px 8px; }
+  button { cursor:pointer; }
+  .wrap { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+  .stage { position:relative; background:#333; overflow:hidden; flex:0 0 auto; line-height:0; }
+  .stage img { display:block; user-select:none; -webkit-user-drag:none; }
+  .box { position:absolute; border:2px solid #00e5ff; background:rgba(0,229,255,.12);
+         box-shadow:0 0 0 9999px rgba(0,0,0,.5); cursor:move; }
+  .handle { position:absolute; width:12px; height:12px; background:#00e5ff; border:1px solid #fff; }
+  .nw{left:-7px;top:-7px;cursor:nwse-resize} .ne{right:-7px;top:-7px;cursor:nesw-resize}
+  .sw{left:-7px;bottom:-7px;cursor:nesw-resize} .se{right:-7px;bottom:-7px;cursor:nwse-resize}
+  .panel { flex:0 0 auto; }
+  canvas { border:1px solid #bbb; display:block; background:#fff; }
+  .info { font-size:12px; color:#555; margin-top:6px; line-height:1.7; }
+  code { background:#eee; padding:1px 4px; }
+  .drop { border:2px dashed #bbb; padding:10px 16px; color:#666; font-size:13px; cursor:pointer; }
+  .drop.hover { border-color:#00e5ff; color:#0a6; }
+  .warn { color:#c60; }
+  label { font-size:13px; }
+</style>
+</head>
+<body>
+<h1>Kindle 屏保选图工具</h1>
+<div class="hint">选一张本地图片，在左图拖动青色框选取区域（四角可缩放、框内可移动），右侧实时预览灰度屏保效果。比例会自动锁定为所选机型的屏幕比例，导出即为该机型的准确尺寸。</div>
+
+<div class="bar">
+  <label>机型 <select id="model"></select></label>
+  <label class="drop" id="drop">点击选图 / 拖图片到这里</label>
+  <input type="file" id="file" accept="image/*" style="display:none">
+  <button id="reset">重置选区</button>
+  <button id="download">导出 PNG</button>
+  <label>编号 <input id="idx" type="number" min="0" max="99" value="0" style="width:52px"></label>
+  <label>份数 <input id="copies" type="number" min="1" max="20" value="1" style="width:52px"></label>
+  <span id="fname" style="font-size:13px;color:#0a6;"></span>
+</div>
+
+<div class="wrap">
+  <div class="stage" id="stage">
+    <img id="img" alt="请先选择图片">
+    <div class="box" id="box" style="display:none">
+      <div class="handle nw" data-h="nw"></div><div class="handle ne" data-h="ne"></div>
+      <div class="handle sw" data-h="sw"></div><div class="handle se" data-h="se"></div>
+    </div>
+  </div>
+  <div class="panel">
+    <canvas id="prev" width="268" height="362"></canvas>
+    <div class="info" id="info">请先选择一张图片。</div>
+  </div>
+</div>
+
+<script>
+// 机型尺寸表：与 kss-devices.ps1 / models.py 同源（2026-11-28 核查）。
+// key 为机型代号，label 为显示名，w/h 为竖屏物理分辨率。
+// 系统 blanket 屏保不缩放，输出必须精确匹配。
+const MODELS = [
+  {key:'kt4',       label:'Kindle Basic 4 / KT4 (2022)',        w:1072, h:1448},
+  {key:'k2024',     label:'Kindle 2024 基础款',                  w:1072, h:1448},
+  {key:'pw3',       label:'Paperwhite 3 (2015)',                 w:1072, h:1448},
+  {key:'pw4',       label:'Paperwhite 4 (2018)',                 w:1072, h:1448},
+  {key:'voyage',    label:'Voyage (2014)',                       w:1072, h:1448},
+  {key:'oasis1',    label:'Oasis 1 (2016)',                      w:1072, h:1448},
+  {key:'pw5',       label:'Paperwhite 5 (2021, 6.8")',           w:1236, h:1648},
+  {key:'pw6',       label:'Paperwhite 6 (2024, 7")',             w:1264, h:1680},
+  {key:'oasis2',    label:'Oasis 2/3 (2017/2019) — 存疑',        w:1264, h:1680},
+  {key:'colorsoft', label:'ColorSoft (2024, 彩色)',              w:1264, h:1680},
+  {key:'scribe',    label:'Scribe (2022, 10.2")',                w:1860, h:2480},
+  {key:'pw1',       label:'Paperwhite 1/2 (2012/13) — 存疑',     w:768,  h:1024},
+  {key:'k600',      label:'早期 6 寸机型 (600×800)',             w:600,  h:800},
+  {key:'kdx',       label:'Kindle DX/DXG (824×1200)',            w:824,  h:1200}
+];
+
+const img = document.getElementById('img');
+const stage = document.getElementById('stage');
+const box = document.getElementById('box');
+const canvas = document.getElementById('prev');
+const ctx = canvas.getContext('2d');
+const info = document.getElementById('info');
+const modelSel = document.getElementById('model');
+const fileInput = document.getElementById('file');
+const drop = document.getElementById('drop');
+
+let displayScale = 1;
+let sel = {x:0, y:0, w:0, h:0};
+let hasImage = false;
+
+function model() { return MODELS.find(m => m.key === modelSel.value) || MODELS[0]; }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+// 初始化机型下拉
+MODELS.forEach((m, i) => {
+  const o = document.createElement('option');
+  o.value = m.key;
+  o.textContent = m.label + ' — ' + m.w + '×' + m.h;
+  if (m.key === 'kt4') o.selected = true;
+  modelSel.appendChild(o);
+});
+
+function onModelChange() {
+  const m = model();
+  canvas.width = Math.round(m.w * 268 / m.h);
+  canvas.height = 268;
+  if (hasImage) initBox();
+  updLabel();
+}
+modelSel.addEventListener('change', onModelChange);
+
+function initBox() {
+  if (!hasImage) return;
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const m = model();
+  const ratio = m.w / m.h;
+  let w = Math.min(W, H * ratio);
+  let h = w / ratio;
+  sel = {x:(W - w) / 2, y:(H - h) / 2, w:w, h:h};
+  box.style.display = 'block';
+  drawBox(); render();
+}
+function drawBox() {
+  box.style.left   = (sel.x * displayScale) + 'px';
+  box.style.top    = (sel.y * displayScale) + 'px';
+  box.style.width  = (sel.w * displayScale) + 'px';
+  box.style.height = (sel.h * displayScale) + 'px';
+}
+
+// 按选区裁剪到目标机型尺寸并转 8-bit 灰度
+function makeOutput() {
+  const m = model();
+  const tmp = document.createElement('canvas');
+  tmp.width = m.w; tmp.height = m.h;
+  const t = tmp.getContext('2d');
+  t.drawImage(img, sel.x, sel.y, sel.w, sel.h, 0, 0, m.w, m.h);
+  const d = t.getImageData(0, 0, m.w, m.h), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const g = Math.round(0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]);
+    p[i] = p[i + 1] = p[i + 2] = g;
+  }
+  t.putImageData(d, 0, 0);
+  return tmp;
+}
+function render() {
+  if (!hasImage) return;
+  const m = model();
+  const tmp = makeOutput();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(tmp, 0, 0, canvas.width, canvas.height);
+  const note = m.key === 'oasis2' || m.key === 'pw1'
+    ? '<br><span class="warn">该机型尺寸存在资料差异，请以设备 kss conn 读到的尺寸为准。</span>' : '';
+  info.innerHTML = '选区（原图像素）: x=' + Math.round(sel.x) + ', y=' + Math.round(sel.y) +
+                   ', w=' + Math.round(sel.w) + ', h=' + Math.round(sel.h) + '<br>' +
+                   '输出: <code>' + m.w + ' × ' + m.h + '</code> 8-bit 灰度 PNG' + note;
+}
+
+// 选区拖拽（保持机型比例）
+let drag = null;
+function point(e) {
+  const r = stage.getBoundingClientRect();
+  return {x:(e.clientX - r.left) / displayScale, y:(e.clientY - r.top) / displayScale};
+}
+box.addEventListener('mousedown', e => {
+  const h = e.target.dataset.h;
+  drag = {mode: h || 'move', start: point(e), orig: {...sel}};
+  e.preventDefault(); e.stopPropagation();
+});
+window.addEventListener('mousemove', e => {
+  if (!drag) return;
+  const p = point(e), dx = p.x - drag.start.x, dy = p.y - drag.start.y;
+  const W = img.naturalWidth, H = img.naturalHeight, o = drag.orig;
+  const ratio = model().w / model().h;
+  if (drag.mode === 'move') {
+    sel.x = clamp(o.x + dx, 0, W - o.w);
+    sel.y = clamp(o.y + dy, 0, H - o.h);
+  } else {
+    let nx = o.x, ny = o.y, nw = o.w, nh = o.h;
+    if (drag.mode === 'se' || drag.mode === 'ne') {
+      nw = Math.max(120, o.w + dx); nh = nw / ratio;
+      if (drag.mode === 'ne') ny = o.y + o.h - nh;
+    } else {
+      nw = Math.max(120, o.w - dx); nh = nw / ratio;
+      nx = o.x + o.w - nw;
+      if (drag.mode === 'sw') ny = o.y; else ny = o.y + o.h - nh;
+    }
+    if (nx < 0) { nw += nx; nx = 0; nh = nw / ratio; }
+    if (ny < 0) { nh += ny; ny = 0; nw = nh * ratio; }
+    if (nx + nw > W) { nw = W - nx; nh = nw / ratio; }
+    if (ny + nh > H) { nh = H - ny; nw = nh * ratio; }
+    sel = {x:nx, y:ny, w:nw, h:nh};
+  }
+  drawBox(); render();
+});
+window.addEventListener('mouseup', () => drag = null);
+
+function curIdx() { return parseInt(document.getElementById('idx').value, 10) || 0; }
+function fnameFor(i) { return 'bg_ss' + String(i).padStart(2, '0') + '.png'; }
+function updLabel() {
+  const n = parseInt(document.getElementById('copies').value, 10) || 1;
+  const i = curIdx();
+  const label = n <= 1 ? fnameFor(i) : fnameFor(i) + ' … ' + fnameFor(i + n - 1) + '（共' + n + '张）';
+  document.getElementById('fname').textContent = '将导出为 ' + label;
+}
+document.getElementById('idx').addEventListener('input', updLabel);
+document.getElementById('copies').addEventListener('input', updLabel);
+document.getElementById('reset').addEventListener('click', initBox);
+
+document.getElementById('download').addEventListener('click', () => {
+  if (!hasImage) { alert('请先选择一张图片。'); return; }
+  const tmp = makeOutput();
+  const n = parseInt(document.getElementById('copies').value, 10) || 1;
+  const start = curIdx();
+  tmp.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    for (let k = 0; k < n; k++) {
+      const a = document.createElement('a');
+      a.download = fnameFor(start + k); a.href = url;
+      setTimeout(() => a.click(), k * 150);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 3000 + n * 150);
+  }, 'image/png');
+});
+
+function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) { alert('请选择图片文件。'); return; }
+  const reader = new FileReader();
+  reader.onload = e => load(e.target.result);
+  reader.readAsDataURL(file);
+}
+function load(src) {
+  img.onload = () => {
+    const maxW = 760;
+    displayScale = Math.min(1, maxW / img.naturalWidth);
+    img.style.width = (img.naturalWidth * displayScale) + 'px';
+    img.style.height = (img.naturalHeight * displayScale) + 'px';
+    stage.style.width = img.style.width;
+    stage.style.height = img.style.height;
+    hasImage = true;
+    initBox();
+  };
+  img.src = src;
+}
+drop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); drop.classList.add('hover');
+}));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => {
+  e.preventDefault(); drop.classList.remove('hover');
+}));
+drop.addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+onModelChange();
+updLabel();
+</script>
+</body>
+</html>

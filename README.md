@@ -61,8 +61,23 @@ kss rollback                 恢复最近一次备份
 | `3-拖图片到这里加屏保.bat` | 将图片文件拖放到此脚本图标上即可添加 |
 | `4-检查Kindle.bat` | 检查设备连接状态 |
 | `5-恢复备份.bat` | 恢复最近一次备份的图片 |
+| `6-选图裁剪.bat` | 打开选图工具，从本地图片中框选区域并导出屏保用图 |
 
 其中 `3-拖图片到这里加屏保.bat` 支持一次拖放多张图片。脚本执行后会提示确认，输入 `y` 并回车表示同意。
+
+### 3.2.1 选图裁剪工具
+
+`kss-crop.html` 是一个不需要安装、双击即可在浏览器中使用的选图工具，用于从一张较大的图片中框选一块区域，生成符合目标机型尺寸的屏保图片。双击 `6-选图裁剪.bat` 即可打开。
+
+使用步骤：
+
+1. 在网页中点击"点击选图"选择本地图片，或将图片文件拖到该区域。
+2. 在"机型"下拉框中选择目标设备；选区比例会随之锁定为该机型的屏幕比例。
+3. 在左侧图片上拖动青色框选区（四角可缩放、框内可移动），右侧实时预览灰度效果。
+4. 设置起始编号与份数，点击"导出 PNG"。生成的文件按 `bg_ssNN.png` 命名，默认下载到浏览器的下载目录。
+5. 将生成的图片用 `3-拖图片到这里加屏保.bat` 添加到设备。
+
+该工具支持的机型尺寸与 `kss-devices.ps1` 一致。系统屏保不缩放图片，选区比例应与目标机型一致，否则图片不会被显示。Paperwhite 1/2 与 Oasis 2 的尺寸存在资料差异，工具会给出提示，建议以 `kss conn` 从设备读取的尺寸为准。
 
 ### 3.3 尺寸与路线的自动识别
 
@@ -165,7 +180,7 @@ kss add C:\pic.jpg -WhatIf
 
 GUI 部分：`models.py` 维护机型尺寸表，`converter.py` 负责图片转换，`device.py` 负责设备连接与路线检测，`deploy.py` 负责上传与校验，`gui_qt.py` 为图形界面入口；`gui.py.bak-tkinter-20261120` 为旧版备份，已不再使用。
 
-命令行部分：`manage-screensaver.ps1` 为主入口，`kss-device.ps1` 封装设备操作，`kss-common.ps1` 提供公共函数，`kss-devices.ps1` 维护机型数据表，`kss-agent.sh` 在设备端执行敏感操作，`kss-probe.py` 供安装程序探测环境，`kss-contact-sheet.py` 生成编号预览图，`to-kindle-screensaver.py` 负责图片转换。`kss-agent.sh` 需保留在设备的 `/mnt/us/` 目录，不得删除。
+命令行部分：`manage-screensaver.ps1` 为主入口，`kss-device.ps1` 封装设备操作，`kss-common.ps1` 提供公共函数，`kss-devices.ps1` 维护机型数据表，`kss-agent.sh` 在设备端执行敏感操作，`kss-probe.py` 供安装程序探测环境，`kss-contact-sheet.py` 生成编号预览图，`to-kindle-screensaver.py` 负责图片转换。`kss-agent.sh` 需保留在设备的 `/mnt/us/` 目录，不得删除。选图工具 `kss-crop.html` 为独立的单文件前端页面，通过 `6-选图裁剪.bat` 打开。
 
 ## 八、许可
 

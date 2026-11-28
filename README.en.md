@@ -61,8 +61,23 @@ The tool directory contains Windows batch scripts that can be run by double-clic
 | `3-拖图片到这里加屏保.bat` | Drag image files onto this icon to add them |
 | `4-检查Kindle.bat` | Check device connectivity |
 | `5-恢复备份.bat` | Restore the most recent backup |
+| `6-选图裁剪.bat` | Open the image cropper to select a region from a local image and export a screensaver image |
 
 `3-拖图片到这里加屏保.bat` accepts multiple files in one drag-and-drop operation. After a script starts, it asks for confirmation; type `y` and press Enter to proceed.
+
+### 3.2.1 Image cropping tool
+
+`kss-crop.html` is an installation-free, single-file tool that runs in the browser. It selects a region from a larger image and exports it at the exact size required by the target device. Double-click `6-选图裁剪.bat` to open it.
+
+Usage:
+
+1. Click "选择图片" in the page to pick a local image, or drag an image file onto that area.
+2. Select the target device from the model drop-down; the selection rectangle is locked to that device's screen aspect ratio.
+3. Drag the cyan rectangle over the image (corner handles resize, dragging inside moves it). The right pane previews the grayscale result in real time.
+4. Set the starting index and number of copies, then click "导出 PNG". Files are named `bg_ssNN.png` and saved to the browser's download directory.
+5. Add the generated images to the device using `3-拖图片到这里加屏保.bat`.
+
+The supported model sizes match `kss-devices.ps1`. The system screensaver does not scale images, so the selection ratio must match the target device. Sources disagree on Paperwhite 1/2 and Oasis 2; the tool displays a note for these models, and the size reported by `kss conn` should be used as the authoritative value.
 
 ### 3.3 Automatic detection of size and route
 
@@ -165,7 +180,7 @@ The following links were verified as accessible on 2026-11-28. Choose the tutori
 
 GUI components: `models.py` maintains the device-size table, `converter.py` handles image conversion, `device.py` manages connections and route detection, `deploy.py` handles upload and verification, and `gui_qt.py` is the GUI entry point. `gui.py.bak-tkinter-20261120` is an obsolete backup.
 
-Command-line components: `manage-screensaver.ps1` is the main entry point, `kss-device.ps1` wraps device operations, `kss-common.ps1` provides shared functions, `kss-devices.ps1` maintains the device table, `kss-agent.sh` performs sensitive operations on the device, `kss-probe.py` is used by the installer to inspect the environment, `kss-contact-sheet.py` generates the numbered preview, and `to-kindle-screensaver.py` converts images. `kss-agent.sh` must remain in `/mnt/us/` on the device and must not be deleted.
+Command-line components: `manage-screensaver.ps1` is the main entry point, `kss-device.ps1` wraps device operations, `kss-common.ps1` provides shared functions, `kss-devices.ps1` maintains the device table, `kss-agent.sh` performs sensitive operations on the device, `kss-probe.py` is used by the installer to inspect the environment, `kss-contact-sheet.py` generates the numbered preview, and `to-kindle-screensaver.py` converts images. `kss-agent.sh` must remain in `/mnt/us/` on the device and must not be deleted. The cropping tool `kss-crop.html` is a standalone single-file page opened through `6-选图裁剪.bat`.
 
 ## 8. License
 
