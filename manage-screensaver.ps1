@@ -104,7 +104,12 @@ function Ensure-Connection {
             return $true
         }
     }
-    Write-Host "`n没找到 Kindle。请确认：设备唤醒、同一网络、SSH 已开(2222)。也可 -HostIP x.x.x.x 指定。" -ForegroundColor Yellow
+    Write-Host "`n没有找到 Kindle。按下面顺序试一遍：" -ForegroundColor Red
+    Write-Host "  1. 按一下 Kindle 的电源键，等屏幕亮起来，再等半分钟。"
+    Write-Host "  2. 看 Kindle 连的 Wi-Fi，和这台电脑是不是同一个（名字一样）。"
+    Write-Host "  3. 如果之前有人帮你弄过 Kindle，问问他 SSH 有没有打开。"
+    Write-Host "  4. 都确认过了还不行，就把这个窗口拍下来找人帮忙。"
+    Write-Host "  （懂电脑的人可以直接加 -HostIP 192.168.x.x 指定地址。）"
     return $false
 }
 
@@ -166,11 +171,22 @@ function Convert-And-Push {
 }
 
 Write-Host "`n=== Kindle 熄屏封面管理 ===" -ForegroundColor Green
+Write-Host "开始前先做两件事（做了再往下）：" -ForegroundColor Yellow
+Write-Host "  1. 按一下 Kindle 的电源键，让屏幕亮起来，等半分钟。"
+Write-Host "  2. 确认 Kindle 和这台电脑连的是同一个 Wi-Fi。"
 if (-not $Action) {
-    Write-Host "`n选择操作：" -ForegroundColor Cyan
-    Write-Host "  1=看图  2=加图  3=删图  4=替换  5=列出  6=体检"
+    Write-Host "`n你想做什么？输入前面的数字，然后按回车：" -ForegroundColor Cyan
+    Write-Host "  1  看看现在有哪些屏保，每张是几号"
+    Write-Host "  2  加新图片（会让你用鼠标选文件，不用打字输路径）"
+    Write-Host "  3  删掉某几张"
+    Write-Host "  4  用新图片换掉某一张"
+    Write-Host "  5  只列出屏保文件名"
+    Write-Host "  6  检查 Kindle 连得正不正常"
     $c = Read-Host "输入 1/2/3/4/5/6"
-    $Action = switch ($c) { "1"{"preview"} "2"{"add"} "3"{"remove"} "4"{"replace"} "5"{"list"} "6"{"detect"} default { throw "无效选择" } }
+    $Action = switch ($c) {
+        "1"{"preview"} "2"{"add"} "3"{"remove"} "4"{"replace"}
+        "5"{"list"} "6"{"detect"} default { Write-Host "没看懂，请输入 1 到 6 之间的一个数字。"; exit }
+    }
 }
 
 # dry-run 不需要连设备；rollback 也不需要
